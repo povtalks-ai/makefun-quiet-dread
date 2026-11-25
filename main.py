@@ -33,14 +33,32 @@ def build_comment() -> str:
 
 
 def validate(line: str) -> str:
-    """Enforce the gate: 1-140 characters, one line, not only whitespace."""
-    if not line or not line.strip():
+    """Enforce the gate: 1-140 characters, one line, not only whitespace.
+
+    A trailing newline (or surrounding whitespace) from a caller is
+    stripped defensively before the checks, so a line that is otherwise
+    valid is not rejected for a stray line ending. An embedded newline
+    is still an error, and its position is reported so the caller can
+    find it.
+    """
+    # Defensive strip: surrounding whitespace is transport noise, not
+    # part of the entry; build_comment() already normalises it away.
+    line = line.strip()
+    if not line:
         raise ValueError("entry must not be empty or only whitespace")
-    if "\n" in line or "\r" in line:
-        raise ValueError("entry must be a single line")
+    newline_at = min(
+        (pos for pos in (line.find("\n"), line.find("\r")) if pos != -1),
+        default=-1,
+    )
+    if newline_at != -1:
+        raise ValueError(
+            "entry must be a single line (newline at character %d)"
+            % newline_at
+        )
     if len(line) > MAX_CHARS:
         raise ValueError(
-            "entry is %d characters, over the %d limit" % (len(line), MAX_CHARS)
+            "entry is %d characters, %d over the %d limit"
+            % (len(line), len(line) - MAX_CHARS, MAX_CHARS)
         )
     line.encode("utf-8")
     return line
